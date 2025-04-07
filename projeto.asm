@@ -51,3 +51,29 @@ gotKey:
     MOV R1, A        ; Armazena em R1 também
     RET
 
+; Rotina para mostrar o número no display de 7 segmentos
+MOSTRA:
+    MOV DPTR, #TABELA ; Aponta para a tabela de conversão
+    MOVC A, @A+DPTR   ; Obtém o padrão do display
+    MOV P1, A         ; Envia para o display (conectado em P1)
+    RET
+
+; Tabela de conversão para display de 7 segmentos (ânodo comum)
+; Formato: g f e d c b a
+TABELA:
+    DB 11000000B    ; 0
+    DB 11111001B    ; 1
+    DB 10100100B    ; 2
+    DB 10110000B    ; 3
+    DB 10011001B    ; 4
+    DB 10010010B    ; 5
+    DB 10000010B    ; 6
+    DB 11111000B    ; 7
+    DB 10000000B    ; 8
+    DB 10010000B    ; 9
+    DB 10001000B    ; A
+    DB 10000011B    ; B
+    DB 11000110B    ; C
+    DB 10100001B    ; D
+    DB 10000110B    ; E
+    DB 10001110B    ; F

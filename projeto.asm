@@ -1,79 +1,102 @@
-ORG 0000H
-LJMP INICIO
-
-ORG 0100H
-INICIO:
-    MOV A, #0H       ; Inicializa o acumulador
-    MOV P1, #0FFH    ; Configura P1 como saída para o display
-VOLTA:
-    CALL TECLADO     ; Chama rotina do teclado
-    CALL MOSTRA      ; Chama rotina para mostrar no display
-    SJMP VOLTA       ; Loop principal
-
-TECLADO:
-    MOV R0, #01      ; clear R0 - the first key is key0
-    
-    ; scan row0
-    SETB P0.0        ; set row3
-    CLR P0.3         ; clear row0
-    CALL colScan     ; call column-scan subroutine
-    
-    ; scan row1
-    SETB P0.3        ; set row0
-    CLR P0.2         ; clear row1
-    CALL colScan     ; call column-scan subroutine
-    
-    ; scan row2
-    SETB P0.2        ; set row1
-    CLR P0.1         ; clear row2
-    CALL colScan     ; call column-scan subroutine
-    
-    ; scan row3
-    SETB P0.1        ; set row2
-    CLR P0.0         ; clear row3
-    CALL colScan     ; call column-scan subroutine
-    
-    CJNE R0, #0DH, SAI
-    MOV A, #0H       ; Se tecla especial pressionada, zera display
-SAI:
-    RET
-
-colScan:
-    JNB P0.6, gotKey ; if col0 is cleared - key found
-    INC R0           ; otherwise move to next key
-    JNB P0.5, gotKey ; if col1 is cleared - key found
-    INC R0           ; otherwise move to next key
-    JNB P0.4, gotKey ; if col2 is cleared - key found
-    INC R0           ; otherwise move to next key
-    RET              ; return from subroutine - key not found
-gotKey:
-    MOV A, R0        ; Move o valor da tecla para A
-    MOV R1, A        ; Armazena em R1 também
-    RET
-
-; Rotina para mostrar o número no display de 7 segmentos
-MOSTRA:
-    MOV DPTR, #TABELA ; Aponta para a tabela de conversão
-    MOVC A, @A+DPTR   ; Obtém o padrão do display
-    MOV P1, A         ; Envia para o display (conectado em P1)
-    RET
-
-; Tabela de conversão para display de 7 segmentos (ânodo comum)
-; Formato: g f e d c b a
-TABELA:
-    DB 11000000B    ; 0
-    DB 11111001B    ; 1
-    DB 10100100B    ; 2
-    DB 10110000B    ; 3
-    DB 10011001B    ; 4
-    DB 10010010B    ; 5
-    DB 10000010B    ; 6
-    DB 11111000B    ; 7
-    DB 10000000B    ; 8
-    DB 10010000B    ; 9
-    DB 10001000B    ; A
-    DB 10000011B    ; B
-    DB 11000110B    ; C
-    DB 10100001B    ; D
-    DB 10000110B    ; E
-    DB 10001110B    ; F
+                      ORG 0000H
+0000|                 LJMP START
+       
+                      ORG 0100H
+      START:          
+                      ; --- Inicialização ---
+0100|                 MOV  A,#00H        ; Zera A
+0102|                 MOV  P1,#0FFH      ; Configura P1 como saída (display desligado)
+0105|                 MOV  R1,#00H       ; R1 guarda o último valor de tecla
+       
+      MAIN_LOOP:      
+0107|                 CALL SCAN_KEY      ; Varre o teclado
+0109|                 CALL DISPLAY_KEY   ; Atualiza o display
+010B|                 SJMP MAIN_LOOP     ; Loop infinito
+       
+      ;----------------------------------------
+      ; SCAN_KEY: faz o escaneamento das 4 linhas
+      ; e chama CHECK_COL em cada uma
+      ;----------------------------------------
+      SCAN_KEY:       
+010D|                 MOV  R0,#01H       ; R0 = contador de teclas (1ª tecla)
+                      
+                      ; Linha 0
+010F|                 SETB P0.0          
+0111|                 CLR  P0.3          
+0113|                 CALL CHECK_COL    
+       
+                      ; Linha 1
+0115|                 SETB P0.3
+0117|                 CLR  P0.2
+0119|                 CALL CHECK_COL    
+       
+                      ; Linha 2
+011B|                 SETB P0.2
+011D|                 CLR  P0.1
+011F|                 CALL CHECK_COL    
+       
+                      ; Linha 3
+0121|                 SETB P0.1
+0123|                 CLR  P0.0
+0125|                 CALL CHECK_COL    
+       
+0127|                 RET
+       
+      ;----------------------------------------
+      ; CHECK_COL: testa as 3 colunas; se alguma
+      ; estiver aterrada (tecla pressionada), pula
+      ; para KEY_PRESSED, senão incrementa R0
+      ;----------------------------------------
+      CHECK_COL:      
+0128|                 JNB  P0.6, KEY_PRESSED  ; coluna 0 = 0?
+012B|                 INC  R0                 
+012C|                 JNB  P0.5, KEY_PRESSED  ; coluna 1 = 0?
+012F|                 INC  R0                 
+0130|                 JNB  P0.4, KEY_PRESSED  ; coluna 2 = 0?
+0133|                 INC  R0                 
+0134|                 RET
+       
+      KEY_PRESSED:    
+0135|                 MOV  A,R0          ; A = código da tecla
+0136|                 CJNE A,#0DH, STORE ; se não for 'D' (0x0D), armazena
+                      ; se for tecla especial 'D', limpa display
+0139|                 MOV  A,#00H
+013B|                 MOV  R1,A         
+013C|                 RET
+       
+      STORE:          
+013D|                 MOV  R1,A          ; guarda em R1 o último código válido
+013E|                 RET
+       
+      ;----------------------------------------
+      ; DISPLAY_KEY: pega R1, converte via tabela
+      ; e envia para o display em P1
+      ;----------------------------------------
+      DISPLAY_KEY:    
+013F|                 MOV  A,R1
+0140|                 MOV  DPTR,#TABLE
+0143|                 MOVC A,@A+DPTR     ; busca padrão 7 segmentos
+0144|                 MOV  P1,A
+0146|                 RET
+       
+      ;----------------------------------------
+      ; TABLE: patterns para display de 7 segmentos
+      ; ânodo COMUM — bits: g f e d c b a
+      ;----------------------------------------
+      TABLE:          
+          DB 11000000B    ; 0
+          DB 11111001B    ; 1
+          DB 10100100B    ; 2
+          DB 10110000B    ; 3
+          DB 10011001B    ; 4
+          DB 10010010B    ; 5
+          DB 10000010B    ; 6
+          DB 11111000B    ; 7
+          DB 10000000B    ; 8
+          DB 10010000B    ; 9
+          DB 10001000B    ; A
+          DB 11000000B    ; B
+          DB 11000110B    ; C
+          DB 10100001B    ; D
+          DB 10000110B    ; E
+          DB 10001110B    ; F

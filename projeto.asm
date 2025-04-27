@@ -1,46 +1,46 @@
                       ORG 0000H
-0000|                 LJMP START
+                 LJMP START
        
                       ORG 0100H
       START:          
                       ; --- Inicialização ---
-0100|                 MOV  A,#00H        ; Zera A
-0102|                 MOV  P1,#0FFH      ; Configura P1 como saída (display desligado)
-0105|                 MOV  R1,#00H       ; R1 guarda o último valor de tecla
+                 MOV  A,#00H        ; Zera A
+                 MOV  P1,#0FFH      ; Configura P1 como saída (display desligado)
+                 MOV  R1,#00H       ; R1 guarda o último valor de tecla
        
       MAIN_LOOP:      
-0107|                 CALL SCAN_KEY      ; Varre o teclado
-0109|                 CALL DISPLAY_KEY   ; Atualiza o display
-010B|                 SJMP MAIN_LOOP     ; Loop infinito
+                 CALL SCAN_KEY      ; Varre o teclado
+                 CALL DISPLAY_KEY   ; Atualiza o display
+                 SJMP MAIN_LOOP     ; Loop infinito
        
       ;----------------------------------------
       ; SCAN_KEY: faz o escaneamento das 4 linhas
       ; e chama CHECK_COL em cada uma
       ;----------------------------------------
       SCAN_KEY:       
-010D|                 MOV  R0,#01H       ; R0 = contador de teclas (1ª tecla)
+                 MOV  R0,#01H       ; R0 = contador de teclas (1ª tecla)
                       
                       ; Linha 0
-010F|                 SETB P0.0          
-0111|                 CLR  P0.3          
-0113|                 CALL CHECK_COL    
+                 SETB P0.0          
+                 CLR  P0.3          
+                 CALL CHECK_COL    
        
                       ; Linha 1
-0115|                 SETB P0.3
-0117|                 CLR  P0.2
-0119|                 CALL CHECK_COL    
+                 SETB P0.3
+                 CLR  P0.2
+                 CALL CHECK_COL    
        
                       ; Linha 2
-011B|                 SETB P0.2
-011D|                 CLR  P0.1
-011F|                 CALL CHECK_COL    
+                 SETB P0.2
+                 CLR  P0.1
+                 CALL CHECK_COL    
        
                       ; Linha 3
-0121|                 SETB P0.1
-0123|                 CLR  P0.0
-0125|                 CALL CHECK_COL    
+                 SETB P0.1
+                 CLR  P0.0
+                 CALL CHECK_COL    
        
-0127|                 RET
+                 RET
        
       ;----------------------------------------
       ; CHECK_COL: testa as 3 colunas; se alguma
@@ -48,36 +48,36 @@
       ; para KEY_PRESSED, senão incrementa R0
       ;----------------------------------------
       CHECK_COL:      
-0128|                 JNB  P0.6, KEY_PRESSED  ; coluna 0 = 0?
-012B|                 INC  R0                 
-012C|                 JNB  P0.5, KEY_PRESSED  ; coluna 1 = 0?
-012F|                 INC  R0                 
-0130|                 JNB  P0.4, KEY_PRESSED  ; coluna 2 = 0?
-0133|                 INC  R0                 
-0134|                 RET
+                 JNB  P0.6, KEY_PRESSED  ; coluna 0 = 0?
+                 INC  R0                 
+                JNB  P0.5, KEY_PRESSED  ; coluna 1 = 0?
+                 INC  R0                 
+                 JNB  P0.4, KEY_PRESSED  ; coluna 2 = 0?
+                 INC  R0                 
+                 RET
        
       KEY_PRESSED:    
-0135|                 MOV  A,R0          ; A = código da tecla
-0136|                 CJNE A,#0DH, STORE ; se não for 'D' (0x0D), armazena
+                 MOV  A,R0          ; A = código da tecla
+                 CJNE A,#0DH, STORE ; se não for 'D' (0x0D), armazena
                       ; se for tecla especial 'D', limpa display
-0139|                 MOV  A,#00H
-013B|                 MOV  R1,A         
-013C|                 RET
+                 MOV  A,#00H
+                 MOV  R1,A         
+                 RET
        
       STORE:          
-013D|                 MOV  R1,A          ; guarda em R1 o último código válido
-013E|                 RET
+                 MOV  R1,A          ; guarda em R1 o último código válido
+                 RET
        
       ;----------------------------------------
       ; DISPLAY_KEY: pega R1, converte via tabela
       ; e envia para o display em P1
       ;----------------------------------------
       DISPLAY_KEY:    
-013F|                 MOV  A,R1
-0140|                 MOV  DPTR,#TABLE
-0143|                 MOVC A,@A+DPTR     ; busca padrão 7 segmentos
-0144|                 MOV  P1,A
-0146|                 RET
+                 MOV  A,R1
+                 MOV  DPTR,#TABLE
+                 MOVC A,@A+DPTR     ; busca padrão 7 segmentos
+                 MOV  P1,A
+                 RET
        
       ;----------------------------------------
       ; TABLE: patterns para display de 7 segmentos

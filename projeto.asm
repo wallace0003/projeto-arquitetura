@@ -1,175 +1,252 @@
+; LCD: D4-D7 = P1.4 - P1.7, RS = P1.3, EN = P1.2
+; Keypad: Rows = P0.0 - P0.3, Columns = P0.4 - P0.6
+
+RS      EQU     P1.3
+EN      EQU     P1.2
+
 ORG 0000H
-LJMP START
+    LJMP START
 
-ORG 0100H
+ORG 0030H
 START:
-    ; --- Inicialização ---
-    MOV A, #00H        ; Zera A
-    MOV P1, #0FFH      ; Configura P1 como saída (display desligado)
-    MOV R1, #00H       ; R1 guarda o último valor de tecla
-    MOV R2, #00H       ; R2 = segundos
-    MOV R3, #00H       ; R3 = minutos
-    MOV R4, #00H       ; R4 = flag de cronômetro (0=inativo, 1=ativo)
-    MOV TMOD, #01H     ; Configura Timer 0 no modo 1 (16-bit)
+    ; Início da memória para armazenar os 4 valores
+    MOV R6, #40H
+    MOV R5, #00H     ; Contador
 
-MAIN_LOOP:
-    CALL SCAN_KEY       ; Varre o teclado
-    CALL DISPLAY_KEY    ; Atualiza o display
-    CALL CHECK_TIMER   ; Verifica o cronômetro
-    SJMP MAIN_LOOP     ; Loop infinito
+    ; Inicializa LCD
+    ACALL LCD_INIT
 
-;----------------------------------------
-; SCAN_KEY: faz o escaneamento das 4 linhas
-;----------------------------------------
-SCAN_KEY:
-    MOV R0, #01H       ; R0 = contador de teclas (1ª tecla)
-    
-    ; Linha 0 (P0.3)
-    SETB P0.0          
-    CLR P0.3          
-    CALL CHECK_COL
-    
-    ; Linha 1 (P0.2)
+    ; Exibe formato inicial 00:00
+    MOV A, #80H
+    ACALL POSICIONA_CURSOR
+    MOV A, #30H      ; '0'
+    ACALL SEND_CHAR
+    MOV A, #30H      ; '0'
+    ACALL SEND_CHAR
+    MOV A, #3AH      ; ':'
+    ACALL SEND_CHAR
+    MOV A, #30H      ; '0'
+    ACALL SEND_CHAR
+    MOV A, #30H      ; '0'
+    ACALL SEND_CHAR
+
+    ; Vai ler 4 dígitos e mostrar como hh:mm
+    ACALL Teclado
+
+    ; Posiciona e escreve os valores
+    MOV R0, #40H     ; Ponteiro para dados
+    MOV R1, #80H     ; Cursor posição inicial
+
+    MOV A, R1
+    ACALL POSICIONA_CURSOR
+    MOV A, @R0
+    ACALL SEND_CHAR
+
+    INC R0
+    MOV A, @R0
+    ACALL SEND_CHAR
+
+    MOV A, #3AH      ; ':'
+    ACALL SEND_CHAR
+
+    INC R0
+    MOV A, @R0
+    ACALL SEND_CHAR
+
+    INC R0
+    MOV A, @R0
+    ACALL SEND_CHAR
+
+FIM:
+    SJMP FIM
+
+; ---------------- ENTRADA VIA TECLADO ----------------
+Teclado:
+    MOV R5, #0H
+Loop:
+    CALL Linha
+    CJNE R5, #04H, Loop
+    RET
+
+Linha:
+    ; Linha 0
+    MOV R0, #31H ; começa em '1'
+    SETB P0.0
+    CLR P0.3
+    CALL colScan
+
+    ; Linha 1
+    MOV R0, #34H ; começa em '4'
     SETB P0.3
     CLR P0.2
-    CALL CHECK_COL
-    
-    ; Linha 2 (P0.1)
+    CALL colScan
+
+    ; Linha 2
+    MOV R0, #37H ; começa em '7'
     SETB P0.2
     CLR P0.1
-    CALL CHECK_COL
-    
-    ; Linha 3 (P0.0)
+    CALL colScan
+
+    ; Linha 3 - ajustada
     SETB P0.1
     CLR P0.0
-    CALL CHECK_COL
-    
+
+    JNB P0.6, teclaAsterisco
+    JNB P0.5, teclaZero
+    JNB P0.4, teclaHash
     RET
 
-;----------------------------------------
-; CHECK_COL: verifica as colunas
-;----------------------------------------
-CHECK_COL:
-    JNB P0.6, KEY_PRESSED  ; coluna 0 (P0.6)
-    INC R0                 
-    JNB P0.5, KEY_PRESSED  ; coluna 1 (P0.5)
-    INC R0                 
-    JNB P0.4, KEY_PRESSED  ; coluna 2 (P0.4)
-    INC R0                 
+teclaAsterisco:
+    MOV A, R6
+    ADD A, R5
+    MOV R1, A
+    MOV A, #2AH      ; '*'
+    MOV @R1, A
+    INC R5
+    ACALL espera
     RET
 
-KEY_PRESSED:
-    MOV A, R0          ; A = código da tecla
-    
-    ; Verifica tecla *
-    CJNE A, #0BH, CHECK_HASH  ; se não for 'B' (*), verifica #
-    ; Tecla * pressionada - cancela cronômetro
-    MOV R4, #00H       ; desativa cronômetro
-    MOV R2, #00H       ; zera segundos
-    MOV R3, #00H       ; zera minutos
-    MOV R1, #00H       ; limpa display
-    RET
-    
-CHECK_HASH:
-    CJNE A, #0CH, CHECK_D  ; se não for 'C' (#), verifica D
-    ; Tecla # pressionada - inicia cronômetro
-    MOV R4, #01H       ; ativa cronômetro
-    MOV R2, #00H       ; zera segundos
-    MOV R3, #00H       ; zera minutos
-    RET
-    
-CHECK_D:
-    CJNE A, #0DH, STORE ; se não for 'D', armazena
-    ; Tecla D pressionada - limpa display
-    MOV A, #00H
-    MOV R1, A         
+teclaZero:
+    MOV A, R6
+    ADD A, R5
+    MOV R1, A
+    MOV A, #30H      ; '0'
+    MOV @R1, A
+    INC R5
+    ACALL espera
     RET
 
-STORE:
-    MOV R1, A          ; guarda em R1 o último código válido
+teclaHash:
+    MOV A, R6
+    ADD A, R5
+    MOV R1, A
+    MOV A, #23H      ; '#'
+    MOV @R1, A
+    INC R5
+    ACALL espera
     RET
 
-;----------------------------------------
-; DISPLAY_KEY: mostra o valor no display
-;----------------------------------------
-DISPLAY_KEY:
-    MOV A, R4
-    JZ SHOW_NORMAL    ; se cronômetro inativo, mostra tecla normal
-    
-    ; Mostra segundos quando cronômetro ativo
-    MOV A, R2
-    MOV DPTR, #TABLE
-    MOVC A, @A+DPTR    ; busca padrão 7 segmentos
-    MOV P1, A
+colScan:
+    JNB P0.6, gotKey
+    INC R0
+    JNB P0.5, gotKey
+    INC R0
+    JNB P0.4, gotKey
+    INC R0
     RET
 
-SHOW_NORMAL:
-    MOV A, R1
-    MOV DPTR, #TABLE
-    MOVC A, @A+DPTR    ; busca padrão 7 segmentos
-    MOV P1, A
+gotKey:
+    MOV A, R6
+    ADD A, R5
+    MOV R1, A
+    MOV A, R0
+    MOV @R1, A
+    INC R5
+
+espera:
+    JNB P0.6, espera
+    JNB P0.5, espera
+    JNB P0.4, espera
     RET
 
-;----------------------------------------
-; CHECK_TIMER: controla o cronômetro
-;----------------------------------------
-CHECK_TIMER:
-    MOV A, R4
-    JZ TIMER_DONE      ; se cronômetro inativo, retorna
-    
-    ; Verifica se passou 1 segundo usando o Timer 0
-    JNB TF0, TIMER_DONE  ; verifica overflow do timer
-    
-    ; Timer overflow ocorreu (1 segundo)
-    CLR TF0            ; limpa flag de overflow
-    MOV TH0, #3CH      ; recarrega timer para 50ms
-    MOV TL0, #0B0H
-    
-    ; Contador de interrupções (20x50ms = 1s)
-    DJNZ R7, TIMER_DONE
-    
-    ; Reset do contador de interrupções
-    MOV R7, #20        ; 20 interrupções = 1 segundo
-    
-    ; Incrementa segundos
-    INC R2             
-    MOV A, R2
-    CJNE A, #60, TIMER_DONE
-    MOV R2, #00H       ; zera segundos
-    INC R3             ; incrementa minutos
+; ---------------- LCD ROUTINES ----------------
 
-TIMER_DONE:
+LCD_INIT:
+    CLR RS
+    CLR P1.7
+    CLR P1.6
+    SETB P1.5
+    CLR P1.4
+    ACALL PULSO_EN
+    ACALL DELAY
+
+    ACALL PULSO_EN
+    ACALL DELAY
+
+    SETB P1.7
+    ACALL PULSO_EN
+    ACALL DELAY
+
+    CLR P1.7
+    CLR P1.6
+    CLR P1.5
+    CLR P1.4
+    ACALL PULSO_EN
+
+    SETB P1.6
+    SETB P1.5
+    ACALL PULSO_EN
+    ACALL DELAY
+
+    CLR P1.7
+    CLR P1.6
+    CLR P1.5
+    CLR P1.4
+    ACALL PULSO_EN
+
+    SETB P1.7
+    SETB P1.6
+    SETB P1.5
+    SETB P1.4
+    ACALL PULSO_EN
+    ACALL DELAY
     RET
 
-;----------------------------------------
-; Inicialização do Timer para 50ms
-;----------------------------------------
-INIT_TIMER:
-    MOV TH0, #3CH      ; Valores para 50ms em 12MHz
-    MOV TL0, #0B0H     
-    SETB TR0           ; Inicia o Timer 0
-    MOV R7, #20        ; 20 x 50ms = 1s
+SEND_CHAR:
+    SETB RS
+    MOV C, ACC.7
+    MOV P1.7, C
+    MOV C, ACC.6
+    MOV P1.6, C
+    MOV C, ACC.5
+    MOV P1.5, C
+    MOV C, ACC.4
+    MOV P1.4, C
+    ACALL PULSO_EN
+
+    MOV C, ACC.3
+    MOV P1.7, C
+    MOV C, ACC.2
+    MOV P1.6, C
+    MOV C, ACC.1
+    MOV P1.5, C
+    MOV C, ACC.0
+    MOV P1.4, C
+    ACALL PULSO_EN
+    ACALL DELAY
     RET
 
-;----------------------------------------
-; TABLE: padrões para display de 7 segmentos
-;----------------------------------------
-TABLE:
-    DB 11000000B    ; 0
-    DB 11111001B    ; 1
-    DB 10100100B    ; 2
-    DB 10110000B    ; 3
-    DB 10011001B    ; 4
-    DB 10010010B    ; 5
-    DB 10000010B    ; 6
-    DB 11111000B    ; 7
-    DB 10000000B    ; 8
-    DB 10010000B    ; 9
-    DB 10001000B    ; A (10 - não usado)
-    DB 11000000B    ; B (11 - *)
-    DB 11000110B    ; C (12 - #)
-    DB 10100001B    ; D (13)
-    DB 10000110B    ; E (14 - não usado)
-    DB 10001110B    ; F (15 - não usado)
+POSICIONA_CURSOR:
+    CLR RS
+    MOV C, ACC.7
+    MOV P1.7, C
+    MOV C, ACC.6
+    MOV P1.6, C
+    MOV C, ACC.5
+    MOV P1.5, C
+    MOV C, ACC.4
+    MOV P1.4, C
+    ACALL PULSO_EN
 
-; Chamada de inicialização no início do programa
+    MOV C, ACC.3
+    MOV P1.7, C
+    MOV C, ACC.2
+    MOV P1.6, C
+    MOV C, ACC.1
+    MOV P1.5, C
+    MOV C, ACC.0
+    MOV P1.4, C
+    ACALL PULSO_EN
+    ACALL DELAY
+    RET
+
+PULSO_EN:
+    SETB EN
+    NOP
+    CLR EN
+    RET
+
+DELAY:
+    MOV R7, #100
+AGAIN: DJNZ R7, AGAIN
+    RET

@@ -1,5 +1,5 @@
-; LCD: D4-D7 = P1.4 - P1.7, RS = P1.3, EN = P1.2
-; Keypad: Rows = P0.0 - P0.3, Columns = P0.4 - P0.6
+; LCD: D4-D7 = P1.4–P1.7, RS = P1.3, EN = P1.2
+; Keypad: Rows = P0.0–P0.3, Cols = P0.4–P0.6
 
 RS      EQU     P1.3
 EN      EQU     P1.2
@@ -9,34 +9,32 @@ ORG 0000H
 
 ORG 0030H
 START:
-    MOV R6, #40H      ; Endereço base para armazenar os dígitos
-    MOV R5, #00H      ; Contador de dígitos
+    MOV R6, #40H       ; base para armazenar os dígitos
+    MOV R5, #00H       ; contador de dígitos
 
-    ; Inicializa LCD
     ACALL LCD_INIT
 
     ; Exibe 00:00
     MOV A, #80H
     ACALL POSICIONA_CURSOR
-    MOV A, #30H
+    MOV A, #30H        ; '0'
     ACALL SEND_CHAR
     MOV A, #30H
     ACALL SEND_CHAR
-    MOV A, #3AH
+    MOV A, #3AH        ; ':'
     ACALL SEND_CHAR
     MOV A, #30H
     ACALL SEND_CHAR
     MOV A, #30H
     ACALL SEND_CHAR
 
-    ; Captura 4 dígitos do teclado
+    ; Captura 4 dígitos
     ACALL Teclado
 
-    ; Exibe os valores digitados como hh:mm
+    ; Exibe hh:mm digitado
     MOV R0, #40H
     MOV A, #80H
     ACALL POSICIONA_CURSOR
-
     MOV A, @R0
     ACALL SEND_CHAR
     INC R0
@@ -51,43 +49,45 @@ START:
     MOV A, @R0
     ACALL SEND_CHAR
 
-    ; Aguarda 2 segundos
+    ; Aguarda 2 s
     ACALL DELAY_1S
     ACALL DELAY_1S
 
-    ; Converte tempo alvo para R2 (horas) e R3 (minutos)
+    ; Converte hh:mm em R2 e R3 (valores numéricos)
     MOV R0, #40H
     MOV A, @R0
     SUBB A, #30H
     MOV B, #10
     MUL AB
+    MOV R2, A        ; horas alvo
+    INC R0
+    MOV A, @R0
+    SUBB A, #30H
+    ADD A, R2
     MOV R2, A
 
     INC R0
     MOV A, @R0
     SUBB A, #30H
-    ADD A, R2
-    MOV R2, A          ; R2 = horas alvo
-
-    INC R0
-    MOV A, @R0
-    SUBB A, #30H
     MOV B, #10
     MUL AB
-    MOV R3, A
-
+    MOV R3, A        ; minutos alvo
     INC R0
     MOV A, @R0
     SUBB A, #30H
     ADD A, R3
-    MOV R3, A          ; R3 = minutos alvo
+    MOV R3, A
 
-    ; Inicializa contagem
-    MOV R4, #00        ; R4 = horas atuais
-    MOV R5, #00        ; R5 = minutos atuais
+    ; Salva alvo em RAM p/ comparação no EDSIM51
+    MOV 30H, R2
+    MOV 31H, R3
+
+    ; Inicializa relógio em 00:00
+    MOV R4, #00      ; hora atual
+    MOV R5, #00      ; min atual
 
 LOOP_ALARME:
-    ; Atualiza display com R4:R5
+    ; Mostra R4:R5 no LCD
     MOV A, #80H
     ACALL POSICIONA_CURSOR
 
@@ -112,35 +112,31 @@ LOOP_ALARME:
     ADD A, #30H
     ACALL SEND_CHAR
 
-; Salva os valores em memória temporária
-MOV 30H, R2
-MOV 31H, R3
+    ; Se chegou no alvo → alarme
+    MOV A, R4
+    CJNE A, 30H, INC_TIMER
+    MOV A, R5
+    CJNE A, 31H, INC_TIMER
+    SJMP ALARME
 
-; Compara usando o acumulador A e operandos diretos
-MOV A, R4
-CJNE A, 30H, CONTINUA
-MOV A, R5
-CJNE A, 31H, CONTINUA
-SJMP ALARME
-
-
-CONTINUA:
-    ; Espera 1 segundo
+; ─── Rotina de incremento corrigida ───
+INC_TIMER:
     ACALL DELAY_1S
-
-    ; Incrementa minutos
     INC R5
-    CJNE R5, #60, LOOP_ALARME
-    MOV R5, #00
-    INC R4
+    CJNE R5, #60, LOOP_ALARME   ; se R5 < 60, volta mostrar
+    MOV R5, #00                 ; senão, zera minutos
+    INC R4                      ; incrementa hora
     SJMP LOOP_ALARME
 
+; ─── Alarme: limpa e printa "ALARME" ───
 ALARME:
-    ; Alarme ativo - pode piscar, som, etc.
-ALARME_LOOP:
-    MOV A, #80H
+    ; Limpa display
+    MOV A, #01H
     ACALL POSICIONA_CURSOR
-    MOV A, #'A'
+    ACALL DELAY
+
+    ; Exibe "ALARME"
+    MOV A, #'A'  ; posição corrente
     ACALL SEND_CHAR
     MOV A, #'L'
     ACALL SEND_CHAR
@@ -153,23 +149,11 @@ ALARME_LOOP:
     MOV A, #'E'
     ACALL SEND_CHAR
 
-    ACALL DELAY_1S
-
-    ; Limpa mensagem
-    MOV A, #80H
-    ACALL POSICIONA_CURSOR
-    MOV A, #' '
-    ACALL SEND_CHAR
-    ACALL SEND_CHAR
-    ACALL SEND_CHAR
-    ACALL SEND_CHAR
-    ACALL SEND_CHAR
-    ACALL SEND_CHAR
-
-    ACALL DELAY_1S
-    SJMP ALARME_LOOP
+    SJMP ALARME        ; loop infinito
 
 ; -----------------------------------------------------
+; Rotinas de teclado, LCD e delays
+
 Teclado:
     MOV R5, #00H
 READ_LOOP:
@@ -178,25 +162,18 @@ READ_LOOP:
     RET
 
 Linha:
-    ; Linha 0
     MOV R0, #31H
     SETB P0.0
     CLR P0.3
     CALL colScan
-
-    ; Linha 1
     MOV R0, #34H
     SETB P0.3
     CLR P0.2
     CALL colScan
-
-    ; Linha 2
     MOV R0, #37H
     SETB P0.2
     CLR P0.1
     CALL colScan
-
-    ; Linha 3
     SETB P0.1
     CLR P0.0
     JNB P0.6, teclaAsterisco
@@ -257,7 +234,6 @@ espera:
     JNB P0.4, espera
     RET
 
-; -----------------------------------------------------
 LCD_INIT:
     CLR RS
     CLR P1.7
@@ -266,31 +242,25 @@ LCD_INIT:
     CLR P1.4
     ACALL PULSO_EN
     ACALL DELAY
-
     ACALL PULSO_EN
     ACALL DELAY
-
     SETB P1.7
     ACALL PULSO_EN
     ACALL DELAY
-
     CLR P1.7
     CLR P1.6
     CLR P1.5
     CLR P1.4
     ACALL PULSO_EN
-
     SETB P1.6
     SETB P1.5
     ACALL PULSO_EN
     ACALL DELAY
-
     CLR P1.7
     CLR P1.6
     CLR P1.5
     CLR P1.4
     ACALL PULSO_EN
-
     SETB P1.7
     SETB P1.6
     SETB P1.5
@@ -310,7 +280,6 @@ SEND_CHAR:
     MOV C, ACC.4
     MOV P1.4, C
     ACALL PULSO_EN
-
     MOV C, ACC.3
     MOV P1.7, C
     MOV C, ACC.2
@@ -334,7 +303,6 @@ POSICIONA_CURSOR:
     MOV C, ACC.4
     MOV P1.4, C
     ACALL PULSO_EN
-
     MOV C, ACC.3
     MOV P1.7, C
     MOV C, ACC.2
@@ -358,9 +326,10 @@ DELAY:
 DL1: DJNZ R7, DL1
     RET
 
+; DELAY_1S ajustado para não usar R4
 DELAY_1S:
-    MOV R4, #5
-L1:  MOV R7, #255
-L2:  DJNZ R7, L2
-     DJNZ R4, L1
-     RET
+    MOV R7, #5
+L1: MOV R1, #255
+L2: DJNZ R1, L2
+    DJNZ R7, L1
+    RET

@@ -9,88 +9,161 @@ ORG 0000H
 
 ORG 0030H
 START:
-    ; Início da memória para armazenar os 4 valores
-    MOV R6, #40H
-    MOV R5, #00H     ; Contador
+    MOV R6, #40H      ; Endereço base para armazenar os dígitos
+    MOV R5, #00H      ; Contador
 
     ; Inicializa LCD
     ACALL LCD_INIT
 
-    ; Exibe formato inicial 00:00
+    ; Exibe 00:00
     MOV A, #80H
     ACALL POSICIONA_CURSOR
-    MOV A, #30H      ; '0'
+    MOV A, #30H
     ACALL SEND_CHAR
-    MOV A, #30H      ; '0'
+    MOV A, #30H
     ACALL SEND_CHAR
-    MOV A, #3AH      ; ':'
+    MOV A, #3AH
     ACALL SEND_CHAR
-    MOV A, #30H      ; '0'
+    MOV A, #30H
     ACALL SEND_CHAR
-    MOV A, #30H      ; '0'
+    MOV A, #30H
     ACALL SEND_CHAR
 
-    ; Vai ler 4 dígitos e mostrar como hh:mm
+    ; Captura 4 dígitos do teclado
     ACALL Teclado
 
-    ; Posiciona e escreve os valores
-    MOV R0, #40H     ; Ponteiro para dados
-    MOV R1, #80H     ; Cursor posição inicial
-
+    ; Exibe os valores digitados como hh:mm
+    MOV R0, #40H
+    MOV R1, #80H
     MOV A, R1
     ACALL POSICIONA_CURSOR
+
     MOV A, @R0
     ACALL SEND_CHAR
-
+    INC R0
+    MOV A, @R0
+    ACALL SEND_CHAR
+    MOV A, #3AH
+    ACALL SEND_CHAR
+    INC R0
+    MOV A, @R0
+    ACALL SEND_CHAR
     INC R0
     MOV A, @R0
     ACALL SEND_CHAR
 
-    MOV A, #3AH      ; ':'
-    ACALL SEND_CHAR
+    ; Aguarda 2 segundos
+    ACALL DELAY_1S
+    ACALL DELAY_1S
+
+    ; Carrega tempo digitado
+    MOV R0, #40H
+    MOV A, @R0
+    SUBB A, #30H
+    MOV B, #10
+    MUL AB
+    MOV R2, A          ; R2 = hh * 10
 
     INC R0
     MOV A, @R0
-    ACALL SEND_CHAR
+    SUBB A, #30H
+    ADD A, R2
+    MOV R2, A          ; R2 = horas
 
     INC R0
     MOV A, @R0
+    SUBB A, #30H
+    MOV B, #10
+    MUL AB
+    MOV R3, A          ; R3 = mm * 10
+
+    INC R0
+    MOV A, @R0
+    SUBB A, #30H
+    ADD A, R3
+    MOV R3, A          ; R3 = minutos
+
+LOOP_TEMPO:
+    ; Atualiza display
+    MOV A, #80H
+    ACALL POSICIONA_CURSOR
+
+    MOV A, R2
+    MOV B, #10
+    DIV AB
+    ADD A, #30H
     ACALL SEND_CHAR
+
+    MOV A, B
+    ADD A, #30H
+    ACALL SEND_CHAR
+
+    MOV A, #3AH
+    ACALL SEND_CHAR
+
+    MOV A, R3
+    MOV B, #10
+    DIV AB
+    ADD A, #30H
+    ACALL SEND_CHAR
+
+    MOV A, B
+    ADD A, #30H
+    ACALL SEND_CHAR
+
+    ; Espera 1 segundo
+    ACALL DELAY_1S
+
+    ; Decrementa tempo
+    MOV A, R3
+    CJNE A, #00H, DEC_MIN
+    ; R3 == 0
+    MOV A, R2
+    CJNE A, #00H, DEC_HORA
+    SJMP FIM          ; Tempo acabou
+
+DEC_HORA:
+    DEC R2
+    MOV R3, #59
+    SJMP LOOP_TEMPO
+
+DEC_MIN:
+    DEC R3
+    SJMP LOOP_TEMPO
 
 FIM:
     SJMP FIM
 
-; ---------------- ENTRADA VIA TECLADO ----------------
+; -----------------------------------------------------
 Teclado:
-    MOV R5, #0H
-Loop:
+    MOV R5, #00H
+READ_LOOP:
     CALL Linha
-    CJNE R5, #04H, Loop
+    CJNE R5, #04H, READ_LOOP
     RET
 
 Linha:
     ; Linha 0
-    MOV R0, #31H ; começa em '1'
+    MOV R0, #31H
     SETB P0.0
     CLR P0.3
     CALL colScan
 
     ; Linha 1
-    MOV R0, #34H ; começa em '4'
+    MOV R0, #34H
     SETB P0.3
     CLR P0.2
     CALL colScan
 
     ; Linha 2
-    MOV R0, #37H ; começa em '7'
+    MOV R0, #37H
     SETB P0.2
     CLR P0.1
     CALL colScan
 
-    ; Linha 3 - ajustada
+    ; Linha 3
     SETB P0.1
     CLR P0.0
-
     JNB P0.6, teclaAsterisco
     JNB P0.5, teclaZero
     JNB P0.4, teclaHash
@@ -100,7 +173,7 @@ teclaAsterisco:
     MOV A, R6
     ADD A, R5
     MOV R1, A
-    MOV A, #2AH      ; '*'
+    MOV A, #2AH
     MOV @R1, A
     INC R5
     ACALL espera
@@ -110,7 +183,7 @@ teclaZero:
     MOV A, R6
     ADD A, R5
     MOV R1, A
-    MOV A, #30H      ; '0'
+    MOV A, #30H
     MOV @R1, A
     INC R5
     ACALL espera
@@ -120,7 +193,7 @@ teclaHash:
     MOV A, R6
     ADD A, R5
     MOV R1, A
-    MOV A, #23H      ; '#'
+    MOV A, #23H
     MOV @R1, A
     INC R5
     ACALL espera
@@ -149,8 +222,7 @@ espera:
     JNB P0.4, espera
     RET
 
-; ---------------- LCD ROUTINES ----------------
-
+; -----------------------------------------------------
 LCD_INIT:
     CLR RS
     CLR P1.7
@@ -248,5 +320,12 @@ PULSO_EN:
 
 DELAY:
     MOV R7, #100
-AGAIN: DJNZ R7, AGAIN
+DL1: DJNZ R7, DL1
     RET
+
+DELAY_1S:
+    MOV R4, #5
+L1:  MOV R7, #255
+L2:  DJNZ R7, L2
+     DJNZ R4, L1
+     RET

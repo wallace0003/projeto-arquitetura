@@ -10,7 +10,7 @@ ORG 0000H
 ORG 0030H
 START:
     MOV R6, #40H      ; Endereço base para armazenar os dígitos
-    MOV R5, #00H      ; Contador
+    MOV R5, #00H      ; Contador de dígitos
 
     ; Inicializa LCD
     ACALL LCD_INIT
@@ -34,8 +34,7 @@ START:
 
     ; Exibe os valores digitados como hh:mm
     MOV R0, #40H
-    MOV R1, #80H
-    MOV A, R1
+    MOV A, #80H
     ACALL POSICIONA_CURSOR
 
     MOV A, @R0
@@ -56,44 +55,47 @@ START:
     ACALL DELAY_1S
     ACALL DELAY_1S
 
-    ; Carrega tempo digitado
+    ; Converte tempo alvo para R2 (horas) e R3 (minutos)
     MOV R0, #40H
     MOV A, @R0
     SUBB A, #30H
     MOV B, #10
     MUL AB
-    MOV R2, A          ; R2 = hh * 10
+    MOV R2, A
 
     INC R0
     MOV A, @R0
     SUBB A, #30H
     ADD A, R2
-    MOV R2, A          ; R2 = horas
+    MOV R2, A          ; R2 = horas alvo
 
     INC R0
     MOV A, @R0
     SUBB A, #30H
     MOV B, #10
     MUL AB
-    MOV R3, A          ; R3 = mm * 10
+    MOV R3, A
 
     INC R0
     MOV A, @R0
     SUBB A, #30H
     ADD A, R3
-    MOV R3, A          ; R3 = minutos
+    MOV R3, A          ; R3 = minutos alvo
 
-LOOP_TEMPO:
-    ; Atualiza display
+    ; Inicializa contagem
+    MOV R4, #00        ; R4 = horas atuais
+    MOV R5, #00        ; R5 = minutos atuais
+
+LOOP_ALARME:
+    ; Atualiza display com R4:R5
     MOV A, #80H
     ACALL POSICIONA_CURSOR
 
-    MOV A, R2
+    MOV A, R4
     MOV B, #10
     DIV AB
     ADD A, #30H
     ACALL SEND_CHAR
-
     MOV A, B
     ADD A, #30H
     ACALL SEND_CHAR
@@ -101,38 +103,71 @@ LOOP_TEMPO:
     MOV A, #3AH
     ACALL SEND_CHAR
 
-    MOV A, R3
+    MOV A, R5
     MOV B, #10
     DIV AB
     ADD A, #30H
     ACALL SEND_CHAR
-
     MOV A, B
     ADD A, #30H
     ACALL SEND_CHAR
 
+; Salva os valores em memória temporária
+MOV 30H, R2
+MOV 31H, R3
+
+; Compara usando o acumulador A e operandos diretos
+MOV A, R4
+CJNE A, 30H, CONTINUA
+MOV A, R5
+CJNE A, 31H, CONTINUA
+SJMP ALARME
+
+
+CONTINUA:
     ; Espera 1 segundo
     ACALL DELAY_1S
 
-    ; Decrementa tempo
-    MOV A, R3
-    CJNE A, #00H, DEC_MIN
-    ; R3 == 0
-    MOV A, R2
-    CJNE A, #00H, DEC_HORA
-    SJMP FIM          ; Tempo acabou
+    ; Incrementa minutos
+    INC R5
+    CJNE R5, #60, LOOP_ALARME
+    MOV R5, #00
+    INC R4
+    SJMP LOOP_ALARME
 
-DEC_HORA:
-    DEC R2
-    MOV R3, #59
-    SJMP LOOP_TEMPO
+ALARME:
+    ; Alarme ativo - pode piscar, som, etc.
+ALARME_LOOP:
+    MOV A, #80H
+    ACALL POSICIONA_CURSOR
+    MOV A, #'A'
+    ACALL SEND_CHAR
+    MOV A, #'L'
+    ACALL SEND_CHAR
+    MOV A, #'A'
+    ACALL SEND_CHAR
+    MOV A, #'R'
+    ACALL SEND_CHAR
+    MOV A, #'M'
+    ACALL SEND_CHAR
+    MOV A, #'E'
+    ACALL SEND_CHAR
 
-DEC_MIN:
-    DEC R3
-    SJMP LOOP_TEMPO
+    ACALL DELAY_1S
 
-FIM:
-    SJMP FIM
+    ; Limpa mensagem
+    MOV A, #80H
+    ACALL POSICIONA_CURSOR
+    MOV A, #' '
+    ACALL SEND_CHAR
+    ACALL SEND_CHAR
+    ACALL SEND_CHAR
+    ACALL SEND_CHAR
+    ACALL SEND_CHAR
+    ACALL SEND_CHAR
+
+    ACALL DELAY_1S
+    SJMP ALARME_LOOP
 
 ; -----------------------------------------------------
 Teclado:

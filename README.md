@@ -2,6 +2,7 @@
 
 ## 👨‍💻 Autores
 Wallace dos Santos Izidoro — RA: 22.123.104-6
+
 Pedro Henrique da F. do Nascimento — RA: 22.123.099-8
 
 ## 📌 Descrição do Projeto

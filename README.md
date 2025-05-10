@@ -20,6 +20,16 @@ Este projeto consiste no desenvolvimento de um Relógio Digital com Despertador 
 * Teclado Matricial 4x3 para entrada de dados
 
 ## Fluxograma do projeto
-![Descrição da Imagem](imagens/mermaid-projeto-arquitetura.png)
+![Fluxograma do projeto](imagens/mermaid-projeto-arquitetura.png)
+
+## Imagens do funcionamento do projeto
+
+### Início
+![Início](imagens/inicio.png)
+
+### Mensagem do despertador
+![Acorda!](imagens/mensagem-acorda.png)
+
+
 
 

@@ -87,6 +87,9 @@ START:
     MOV R5, #00      ; min atual
 
 LOOP_ALARME:
+    ; Verifica tecla '#' a qualquer momento
+    ACALL VERIFICA_HASH
+
     ; Mostra R4:R5 no LCD
     MOV A, #80H
     ACALL POSICIONA_CURSOR
@@ -123,36 +126,68 @@ LOOP_ALARME:
 INC_TIMER:
     ACALL DELAY_1S
     INC R5
-    CJNE R5, #60, LOOP_ALARME   ; se R5 < 60, volta mostrar
-    MOV R5, #00                 ; senão, zera minutos
-    INC R4                      ; incrementa hora
+    CJNE R5, #60, LOOP_ALARME
+    MOV R5, #00
+    INC R4
     SJMP LOOP_ALARME
 
-; ─── Alarme: limpa e printa "ALARME" ───
+; ─── Alarme: limpa e printa "ACORDA" ───
 ALARME:
     ; Limpa display
     MOV A, #01H
     ACALL POSICIONA_CURSOR
+    ACALL DELAY_1S
+
+    MOV A, #80H
+    ACALL POSICIONA_CURSOR
     ACALL DELAY
 
-    ; Exibe "ALARME"
-    MOV A, #'A'  ; posição corrente
-    ACALL SEND_CHAR
-    MOV A, #'L'
-    ACALL SEND_CHAR
+ALARME_LOOP:
+    ACALL VERIFICA_HASH
+
     MOV A, #'A'
     ACALL SEND_CHAR
+    ACALL DELAY
+    MOV A, #'C'
+    ACALL SEND_CHAR
+    ACALL DELAY
+    MOV A, #'O'
+    ACALL SEND_CHAR
+    ACALL DELAY
     MOV A, #'R'
     ACALL SEND_CHAR
-    MOV A, #'M'
+    ACALL DELAY
+    MOV A, #'D'
     ACALL SEND_CHAR
-    MOV A, #'E'
+    ACALL DELAY
+    MOV A, #'A'
     ACALL SEND_CHAR
+    ACALL DELAY
 
-    SJMP ALARME        ; loop infinito
+    SJMP ALARME_LOOP
+
+; ─── Verifica se '#' foi pressionado ───
+VERIFICA_HASH:
+    SETB P0.1
+    SETB P0.2
+    SETB P0.3
+    CLR P0.0        ; Ativa linha 4
+
+    NOP
+    NOP
+
+    JB P0.6, NAO_PRESSIONADO
+    LJMP REINICIA_TUDO
+
+NAO_PRESSIONADO:
+    SETB P0.0
+    RET
+
+REINICIA_TUDO:
+    LJMP START
 
 ; -----------------------------------------------------
-; Rotinas de teclado, LCD e delays
+; Rotinas de teclado, LCD e delays (corrigidas)
 
 Teclado:
     MOV R5, #00H
@@ -181,13 +216,8 @@ Linha:
     JNB P0.4, teclaHash
     RET
 
+; ─── Corrigido: * não armazena nada ───
 teclaAsterisco:
-    MOV A, R6
-    ADD A, R5
-    MOV R1, A
-    MOV A, #2AH
-    MOV @R1, A
-    INC R5
     ACALL espera
     RET
 
@@ -326,7 +356,6 @@ DELAY:
 DL1: DJNZ R7, DL1
     RET
 
-; DELAY_1S ajustado para não usar R4
 DELAY_1S:
     MOV R7, #5
 L1: MOV R1, #255

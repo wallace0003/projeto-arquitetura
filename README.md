@@ -24,6 +24,9 @@ Este projeto consiste no desenvolvimento de um Relógio Digital com Despertador 
 
 ## Imagens do funcionamento do projeto
 
+### Mensagem de boas vindas
+![Início](imagens/mensagem-iniciando.png)
+
 ### Início
 ![Início](imagens/inicio.png)
 

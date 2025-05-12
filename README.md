@@ -1,4 +1,4 @@
-# Projeto de arquitetura de computadores - Relógio Digital⏰
+# Projeto de arquitetura de computadores - Alarme Digital⏰
 
 ## 👨‍💻 Autores
 Wallace dos Santos Izidoro — RA: 22.123.104-6

@@ -11,55 +11,41 @@ EN        EQU    P1.2
 LED_PORT  EQU    P1       ; LEDs em P1.0–P1.7, acendem com 0  
 
 ;------------------------------------------------------------------------------  
-; Reset / vetor de reset  
-;------------------------------------------------------------------------------  
 ORG 0000H  
     LJMP INIT_DISPLAY
 
-;------------------------------------------------------------------------------  
-; Mensagens de inicialização  
-;------------------------------------------------------------------------------  
 ORG 0030H
 FEI:
     DB "ALARME DIGITAL"
-    DB 00h ; Marca null no fim da String
+    DB 00h
 DISPLAY:
     DB "INICIANDO"
-    DB 00h ; Marca null no fim da String
+    DB 00h
 
-;------------------------------------------------------------------------------  
-; Inicialização do display com mensagens  
-;------------------------------------------------------------------------------  
 ORG 0100H
 INIT_DISPLAY:
-    ; Mostra mensagens iniciais
     ACALL LCD_INIT
-    MOV A, #80H            ; Posição inicial da primeira linha
+    MOV A, #80H
     ACALL POSICIONA_CURSOR
-    MOV DPTR, #FEI         ; endereço da string "ALARME DIGITAL"
+    MOV DPTR, #FEI
     ACALL ESCREVE_STRING_ROM
-    MOV A, #0C0H           ; Posição inicial da segunda linha
+    MOV A, #0C0H
     ACALL POSICIONA_CURSOR
-    MOV DPTR, #DISPLAY     ; endereço da string "INICIANDO"
+    MOV DPTR, #DISPLAY
     ACALL ESCREVE_STRING_ROM
-    
-    ; Aguarda 4 segundos
     ACALL DELAY_1S
     ACALL DELAY_1S
     ACALL DELAY_1S
     ACALL DELAY_1S
-    
-    ; Limpa display e vai para o programa principal
     ACALL CLEAR_DISPLAY
     LJMP START
 
-; Rotina para escrever string na ROM
 ESCREVE_STRING_ROM:
     MOV R1, #00h
 LOOP_STRING:
     MOV A, R1
-    MOVC A, @A+DPTR         ; lê da ROM
-    JZ FINISH_STRING        ; fim da string
+    MOVC A, @A+DPTR
+    JZ FINISH_STRING
     ACALL SEND_CHAR
     INC R1
     MOV A, R1
@@ -67,33 +53,26 @@ LOOP_STRING:
 FINISH_STRING:
     RET
 
-;------------------------------------------------------------------------------  
-; Início / menu principal  
-;------------------------------------------------------------------------------  
 START:
-    ; Limpa tudo
-    MOV P1, #0FFH       ; LEDs apagados
-    MOV R4, #00H        ; hora atual
-    MOV R5, #00H        ; minuto atual
-    MOV R7, #00H        ; índice de digitação
-    MOV R6, #40H        ; buffer em 40H
+    MOV P1, #0FFH
+    MOV R4, #00H
+    MOV R5, #00H
+    MOV R7, #00H
+    MOV R6, #40H
 
-    ; Exibe "00:00"
     MOV A, #80H
     ACALL POSICIONA_CURSOR
-    MOV A, #30H  ; '0'
+    MOV A, #30H
     ACALL SEND_CHAR
     ACALL SEND_CHAR
-    MOV A, #3AH  ; ':'
+    MOV A, #3AH
     ACALL SEND_CHAR
     MOV A, #30H
     ACALL SEND_CHAR
     ACALL SEND_CHAR
 
-    ; Lê hhmm (pode abortar em '*' e voltar aqui)
     ACALL TECLADO
 
-    ; Mostra hh:mm digitado
     MOV R0, #40H
     MOV A, #80H
     ACALL POSICIONA_CURSOR
@@ -111,11 +90,9 @@ START:
     MOV A, @R0
     ACALL SEND_CHAR
 
-    ; Aguarda 2s para "fechar os olhos"
     ACALL DELAY_1S
     ACALL DELAY_1S
 
-    ; Converte ASCII→binário em R2 (hh) e R3 (mm)
     MOV R0, #40H
     MOV A, @R0
     CLR C
@@ -144,19 +121,15 @@ START:
     ADD A, R3
     MOV R3, A
 
-    ; Salva alvos
     MOV 30H, R2
     MOV 31H, R3
 
     SJMP LOOP_ALARME
 
-;------------------------------------------------------------------------------  
-; Loop principal do relógio (atualiza display e compara com alvo)  
-;------------------------------------------------------------------------------  
 LOOP_ALARME:
     ACALL CHECK_ASTERISCO
+    ACALL CHECK_PAUSA     ; <<< PAUSA com '#'
 
-    ; Atualiza display
     MOV A, #80H
     ACALL POSICIONA_CURSOR
     MOV A, R4
@@ -180,7 +153,6 @@ LOOP_ALARME:
     ADD A, #30H
     ACALL SEND_CHAR
 
-    ; Se igual ao alvo, dispara alarme
     MOV A, R4
     CJNE A, 30H, INC_TIMER
     MOV A, R5
@@ -195,23 +167,15 @@ INC_TIMER:
     INC R4
     SJMP LOOP_ALARME
 
-;------------------------------------------------------------------------------  
-; Alarme: pisca LEDs e aguarda '*' para reset  
-;------------------------------------------------------------------------------  
 ALARME:
 ALARME_LOOP:
-    MOV LED_PORT, #00H     ; acende todos os LEDs
+    MOV LED_PORT, #00H
     ACALL DELAY_1S
-
-    MOV LED_PORT, #0FFH    ; apaga todos os LEDs
+    MOV LED_PORT, #0FFH
     ACALL DELAY_1S
-
     ACALL CHECK_ASTERISCO
     SJMP ALARME_LOOP
 
-;------------------------------------------------------------------------------  
-; Sub-rotina de reset por '*' (linha P0.0, coluna P0.6)  
-;------------------------------------------------------------------------------  
 CHECK_ASTERISCO:
     SETB P0.1
     SETB P0.2
@@ -219,22 +183,14 @@ CHECK_ASTERISCO:
     CLR P0.0
     NOP
     NOP
-    
     JNB P0.6, _RESET_SISTEMA
     SETB P0.0
     RET
-
 _RESET_SISTEMA:
-    ; Espera soltar a tecla
-    JNB P0.6, $ 
-    ; Limpa o display
+    JNB P0.6, $
     ACALL CLEAR_DISPLAY
-    ; Reinicia completamente
     LJMP INIT_DISPLAY
 
-;------------------------------------------------------------------------------  
-; Rotina de leitura de 4 dígitos (hhmm), aborta com '*'  
-;------------------------------------------------------------------------------  
 TECLADO:
     MOV R7, #00H
 _READ_LOOP:
@@ -312,9 +268,6 @@ ESPERA:
     JNB P0.4, ESPERA
     RET
 
-;------------------------------------------------------------------------------  
-; Rotinas de LCD  
-;------------------------------------------------------------------------------  
 LCD_INIT:
     CLR RS
     CLR P1.7
@@ -429,9 +382,6 @@ PULSO_EN:
     CLR EN
     RET
 
-;------------------------------------------------------------------------------  
-; Rotinas de delay  
-;------------------------------------------------------------------------------  
 DELAY:
     MOV R7, #100
 DL1: DJNZ R7, DL1
@@ -442,4 +392,35 @@ DELAY_1S:
 L1: MOV R1, #255
 L2: DJNZ R1, L2
     DJNZ R7, L1
+    RET
+
+;------------------------------------------------------------------------------  
+; Verifica se '#' foi pressionado e entra em modo de pausa  
+;------------------------------------------------------------------------------  
+CHECK_PAUSA:
+    SETB P0.1
+    SETB P0.2
+    SETB P0.3
+    CLR P0.0
+    NOP
+    NOP
+
+    JNB P0.4, _PAUSA_ENTRA
+    SETB P0.0
+    RET
+
+_PAUSA_ENTRA:
+    JNB P0.4, $
+WAIT_PAUSA:
+    SETB P0.1
+    SETB P0.2
+    SETB P0.3
+    CLR P0.0
+    NOP
+    NOP
+    JNB P0.4, _SAI_PAUSA
+    SJMP WAIT_PAUSA
+
+_SAI_PAUSA:
+    JNB P0.4, $
     RET
